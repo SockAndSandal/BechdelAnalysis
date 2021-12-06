@@ -74,7 +74,7 @@ rawData$domgross_2013.<-as.numeric(rawData$budget_2013.)
 ```{r fig.cap = "Overarching summary of the dataset.", cache=TRUE}
 skim(rawData)
 ```
-There are 9 attributes as we can see here; we'll be utilizing all of these, perhaps except `period.code`, `decade.code` or `code` to answer one or the other question in the process of sheddling light on whether the Bechdel test is a significant metric or not, and whether it has a real foretelling on the movie profitability.
+There are 9 attributes as we can see here; we'll be utilizing all of these, perhaps except `period.code`, `decade.code` or `code` to answer one or the other question in the process of shedding light on whether the Bechdel test is a significant metric or not, and whether it has a real foretelling on the movie profitability.
 
 Some `domgross` and `intgross` are missing, and accordingly `domgross_2013`, `intgross_2013` values as well; let's start by listing them down to figure out whether these are values missing at random or not at random.^[The attributes `budget`, `domgross`, and `intgross` are less relevant for our study because all the financial data included in the dataset has been converted to what would amount to the same money in 2013 after accounting for inflation.]
 
