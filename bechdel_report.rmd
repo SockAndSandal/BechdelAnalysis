@@ -1,0 +1,279 @@
+---
+title: "Exploring the Bechdel Test and its Significance"
+author: "Amanbeer Khanduja"
+date: "`r Sys.Date()`"
+output:
+  tufte::tufte_html: default
+---
+
+```{r setup, include=FALSE}
+require(tufte)
+require(skimr)
+require(knitr)
+require(ggplot2)
+require(gdata)
+require(cwhmisc)
+require(imputeTS)
+require(RColorBrewer)
+require(hrbrthemes)
+library(tidyverse)
+knitr::opts_chunk$set(cache.extra = packageVersion('tufte'))
+```
+
+```{r include=FALSE}
+rawData<-read.csv("bechdel.csv", na.strings="#N/A")
+```
+
+```{r include=FALSE}
+rawData <- as_tibble(rawData)
+```
+
+# Introduction
+
+This project deals with the inherent discrimination and gender bias in the movie industry, focusing here on Hollywood movies released between 1990 to 2013. We're going to study this using what is known as the Bechdel Test. There are caveats to using the Bechdel test - it is by no means perfect or all-inclusive, but it is one of the few tests that has a lot of data available to analyse, and is basic enough that it isn't too narrow a metric either.
+
+> ![](C:\Users\amanb\Desktop\Work\Fall 2021\ISE 201\Term Project\Report\bechdel.jpg)
+
+> "If a movie can satisfy three criteria — there are at least two named women in the picture, they have a conversation with each other
+> at some point, and that conversation isn’t about a male character — then it passes “The Rule”, whereby female characters are
+> allocated a bare minimum of depth."
+>
+> `r tufte::quote_footer('--- Alison Bechdel')`
+
+I'm interested in this topic because firstly, I am fond of movies, and have often done the Bechdel analysis on movies myself before. This is by no means something that people have just come around to doing, after all the test is 25 years old at this point, but I think exploring this in R would be very interesting. Secondly, a test such as this one is highly subjective beyond a PASS or FAIL rating, which also stood out to me as an interesting thing to consider when I was looking for datasets.
+
+# Data
+
+I picked up this dataset from the FiveThirtyEight article titled ['The Dollar-And-Cents Case Against Hollywood’s Exclusion of Women'](https://fivethirtyeight.com/features/the-dollar-and-cents-case-against-hollywoods-exclusion-of-women/).
+
+The dataset is [available on GitHub here](https://github.com/fivethirtyeight/data/tree/master/bechdel), and in a nutshell, measures whether the 1,615 movies in question pass the Bechdel Test, and contains other attributes as well, right from their domestic and international sales, budgets, and IMdb IDs. The unit of collection is in terms of movies i.e every row is a movie.
+
+This data was collected from BechdelTest.com and The-Numbers.com. The site BechdelTest.com is operated by committed moviegoers who analyze films and ascertain if they pass the Bechdel test. The site has detailed, coded information for about 5000 films. The financial data for the movies was collected from The-Numbers.com. The intersection of the two datasets was a set of 1615 films released between 1990 and 2013; these are the movies we're going to analyze. FiveThirtyEight also collected some data on their own, and found that in their broader sample of 1794 movies, the number of movies that passed the test were roughly 53%, while the numbers at BechdelTest.com were ranging closer to 56%.
+
+Since this dataset is composed based on user submission, some inherent user bias is expected. People inclined to watch movies that are more realistic when it comes to depicting women, even in a metric as basic as this, would like to add those movies to the website's dataset, pushing their score upward. Thus, the 3% difference is attributed towards bias.
+
+For the questions that I have in mind, I will be utilizing all the variables from the dataset. 
+
+```{r}
+str(rawData)
+```
+I'll convert all my numeric values to numeric class for simplicity later on when we do regression analysis on our data.
+
+```{r}
+rawData$budget<-as.numeric(rawData$budget_2013.)
+rawData$domgross<-as.numeric(rawData$budget_2013.)
+rawData$budget_2013.<-as.numeric(rawData$budget_2013.)
+rawData$domgross_2013.<-as.numeric(rawData$budget_2013.)
+```
+
+```{r fig.cap = "Overarching summary of the dataset.", cache=TRUE}
+skim(rawData)
+```
+There are 9 attributes as we can see here; we'll be utilizing all of these, perhaps except `period.code`, `decade.code` or `code` to answer one or the other question in the process of sheddling light on whether the Bechdel test is a significant metric or not, and whether it has a real foretelling on the movie profitability.
+
+Some `domgross` and `intgross` are missing, and accordingly `domgross_2013`, `intgross_2013` values as well; let's start by listing them down to figure out whether these are values missing at random or not at random.^[The attributes `budget`, `domgross`, and `intgross` are less relevant for our study because all the financial data included in the dataset has been converted to what would amount to the same money in 2013 after accounting for inflation.]
+
+```{r}
+rawData %>%
+  filter_all(any_vars(is.na(.)))
+```
+
+A lot of the missing data here is attributed for by the `period.code` and `decade.code` columns, which are irrelevant to our current study, so I'm going to drop these columns. We can always recalculate a decade or period for the data mathematically, given that we have a year value. That out of the way, let's move on to some exploratory data analysis. 
+
+```{r}
+rawData = select(rawData, -period.code)
+rawData = select(rawData, -decade.code)
+rawData %>%
+  filter_all(any_vars(is.na(.)))
+```
+
+There are now 18 missing objects in our dataset, and there doesn't seem to be any pattern binding these missing objects together. The easiest way forward is to drop these objects and continue.
+
+```{r}
+rawData$ROI <- na_mean(rawData$ROI)
+```
+
+```{r}
+rawData<- rawData %>% 
+  drop_na()
+```
+
+# Exploratory Data Analysis
+
+Since our test data, in different forms, is largely categorical, a pie chart would be fairly useful to get a general overarching picture of our data.
+
+```{r fig.margin=FALSE, cache=TRUE, message=FALSE, warning=FALSE}
+test_table <- table(rawData$clean_test)
+testframe = data.frame(test_table)
+testframe = testframe %>% 
+  rename(TestResult = Var1)
+ggplot(testframe, aes(x="", y=Freq, fill=TestResult)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void()
+```
+
+A little less than half of our movies pass the Bechdel test, while among the movies that failed, most had women characters who never spoke to each other in the course of the movie. 
+
+Another interesting visualization was the breakdown of the movies that passed and failed the test into more detailed categories that were recorded under `test` and `clean_test`.^[While I'm not particularly sure how I'm going to use the abovementioned metrics to drive my data analysis, they are what add subjectivity to this data, and we can alter the results into perhaps `strict` and `generous` test result categories to see whether making the test harder or easier lends some significance to its existence.]
+
+```{r fig.width = 10, fig.height = 3, fig.fullwidth = FALSE, fig.cap = "The 'subjectivity' breakdown", warning=FALSE, message=FALSE, cache=TRUE}
+ggplot(rawData, aes(clean_test, test)) + 
+  geom_count(aes(color = ..n.., size=..n..)) + 
+  guides(color = 'legend')
+```
+Another interesting visualization that I wanted to consider before we move on to financial data is the evolution of movies over the decades; specifically in the aspect of their performance with respect to the Bechdel test. Consdiering the fact that we have a lot more movies from after 1990s than before, making a grid of histograms would produce a variation in levels that can be taken with a grain of salt; what we are interested in is the difference in levels between the `PASS` and `FAIL` values.
+
+```{marginfigure}
+I ended up needing the decade attribute after all, but the way I calculated it is mathematical and thus eliminates missing values.
+```
+
+
+```{r fig.width = 8, fig.height = 3, fig.fullwidth = TRUE, fig.cap = "Bechdel test performance over the years", warning=FALSE, message=FALSE, cache=TRUE}
+round_to_decade = function(value){ 
+  return(round(value / 10) * 10) 
+}
+rawData$decade = round_to_decade(rawData$year)
+
+ggplot(rawData, aes(binary)) + 
+  geom_histogram(aes(), stat="count", na.rm=TRUE) +
+  facet_grid(~decade)
+```
+
+The 2000s are an interesting time period to consider, this was a time where almost an equal number of movies passed the test as the number that failed. This would help check for things like difference in ROI or earnings keeping the test results as an equal metric. In all other decades, it is clear that the number of movies that passed the test were always higher than the ones that didn't.
+
+## Financial Data
+
+Let's take an overarching look at the financial data we've got in hand. I found that logarithmic scaling gave us a better idea of the magnitudes of movie budgets.
+
+```{r cache=TRUE, message=FALSE, warning=FALSE}
+hist(rawData$budget_2013., na.rm=TRUE, breaks=40, 
+     main="Budget Frequency Chart")
+hist(log(rawData$budget_2013.), breaks=40, 
+     main = "Budget Frequency Chart (Logarithmic Scaling)")
+```
+
+There is a fair amount of small-budget and big-budget movies in our dataset, so we're not limited to just large studio productions or small set indie movies. To dig deeper into financial data, let's split our domestic and total profits to give us total international profits, and calculate ROI.
+
+```{r warning=FALSE, cache=TRUE, message=FALSE}
+rawData$intOnly<-rawData$intgross_2013.-rawData$domgross_2013.
+
+rawData$ROI<-round(rawData$intgross_2013./rawData$budget_2013., 3)
+rawData$ROI_dom<-round(rawData$domgross_2013./rawData$budget_2013., 3)
+rawData$ROI_int<-round(rawData$intOnly/rawData$budget_2013., 3)
+rawData[, c("title","binary", "ROI", "ROI_dom", "ROI_int")]
+```
+
+```{r cache=TRUE, message=FALSE, warning=FALSE}
+failMovies<-rawData[rawData$binary=="FAIL",]
+passMovies<-rawData[rawData$binary=="PASS",]
+
+median(failMovies$budget_2013.)
+median(passMovies$budget_2013.)
+median(rawData$budget_2013.)
+```
+
+Already, there's a stark shift in budgets, as films that fail the Bechdel test, which is a fairly basic metric to begin with, seem to have more money put behind them. A question that naturally arises is, does that convert into better return on investment though, then?
+
+```{r fig.margin=FALSE, cache=TRUE, message=FALSE, warning=FALSE}
+mean(passMovies$ROI, na.rm=TRUE)
+mean(failMovies$ROI, na.rm=TRUE)
+
+h1 = hist(passMovies$ROI, na.rm=TRUE, 
+     breaks=250, 
+     xlim=c(0,25),
+     ylim=c(0,400),
+     xlab="ROI of movies that passed the test")
+text(h1$mids,h1$counts,labels=h1$counts, adj=c(0.5, -0.5))
+h2 = hist(failMovies$ROI, na.rm=TRUE,
+     breaks=250,
+     xlim=c(0,25),
+     ylim=c(0,400),
+     xlab="ROI of movies that failed the test")
+text(h2$mids,h2$counts,labels=h2$counts, adj=c(0.5, -0.5))
+```
+
+This is an interesting set of graphs and figures to consider here, because the histogram skews heavily to the left for both the cases, meaning that the median for this data is much higher than the mean. On an average, the ROI on movies that failed the Bechdel test is higher, which means that on the higher end of the 'high-budget' movie spectrum, movies that failed the Bechdel test earned more money and had a higher ROI. This is compounded by the fact that on an average, more amount of money was put into movies that failed the Bechdel test, and thus intuitively, to have a higher ROI, you'd have to earn proportionately more money; the result is that movies that passed the Bechdel test historically haven't performed as good on the high end of earning.
+
+```{marginfigure}
+An interesting pointer that comes off this deduction is also that movies that passed the Bechdel test were statistically less likely to be flops (i.e cause losses for a producer by not returning the budget money in sales)
+```
+
+But these are all things bound by various other factors as well, the Bechdel test only considered one of them here. For all we know, the Bechdel test, and by extension, addition of women to a movie, should be insignificant to the ROI of a movie, considering that despite the histogram having lower values all around, the two datasets have very similar frequency distributions all around, which makes me wonder whether the test is significantly correlated to ROIs at all.
+
+Having attributes like IMDb ratings for these movies, or the domestic/international ROI comparisons for these movies would be helpful summaries in further exploring this data.
+
+# Regression Analysis
+
+I'm going to do a statistical analysis of films to test two claims: first, that films that pass the Bechdel test — featuring women in stronger roles — see a lower return on investment, and second, that they see lower gross profits. I found no evidence to support either claim, and I'm going to use regression analysis to explain why.
+
+On the first test, I ran a regression to find out if passing the Bechdel test corresponded to lower return on investment. Controlling for the movie’s budget, which has a negative correlation to a film’s return on investment, passing the Bechdel test had no effect on the film’s ROI.
+
+```{r}
+summary(lm((ROI)~(budget_2013.), data=rawData))
+```
+```{marginfigure}
+Here, it's clear that ROI and the budget of a film are a negative and significant relationship. Let's see how this changes when we add the bechdel test factor to this regression equation.
+```
+
+```{r}
+plot(lm((ROI)~(budget_2013.)+factor(binary), data=rawData))
+summary(lm((ROI)~(budget_2013.)+factor(binary), data=rawData))
+```
+```{marginfigure}
+Our p-value is very small for our binary factor, proving that the Bechdel test is not significant to the return of investment on movies. In other words, movies that pass the Bechdel test don't negatively affect the producers' return on investment; thus throwing out the argument of women centric movies being bad for business.
+```
+
+```{r}
+median(failMovies$ROI, na.rm=T)
+median(passMovies$ROI, na.rm=T)
+```
+
+The median ROI of a movie that passes the Bechdel test is 2.702 dollars for each dollar spent. The total median gross return on investment for films that failed was 2.596 dollars for each dollar spent. If we were to take a median ROI plot of movies that didn't pass the Bechdel test both domestically and internationally, here's what we get.
+
+```{r}
+medians_dom <- c((median(rawData$ROI_dom[rawData$clean_test=="men"], na.rm=T)) ,(median(rawData$ROI_dom[rawData$clean_test=="notalk"], na.rm=T)),(median(rawData$ROI_dom[rawData$clean_test=="nowomen"], na.rm=T)))
+medians_int <- c((median(rawData$ROI_int[rawData$clean_test=="men"], na.rm=T)) ,(median(rawData$ROI_int[rawData$clean_test=="notalk"], na.rm=T)),(median(rawData$ROI_int[rawData$clean_test=="nowomen"], na.rm=T)))
+
+colors <- brewer.pal(5, "Set2")
+par(mfrow=c(1,2))
+
+b1<- barplot(medians_dom, main="Median Domestic ROI", xlim=c(0,1.5), horiz=TRUE,names.arg=c("Talk About Men", "Don't Talk", "No Women"), cex.names=0.9, col=colors)
+b2<- barplot(medians_int, main="Median International ROI",xlim=c(0,1.5), horiz=TRUE,names.arg=c("Talk About Men", "Don't Talk", "No Women"), cex.names=0.9, col=colors)
+```
+```{marginfigure}
+While it's easy to discount these differences in ROI in an unexpected direction towards the fact that lower-budget movies often have higher ROI, it is still a strong indicator of the fact that they're good for the producer, contrary to the general opinion, and that female-oriented movies are doing well on the box office.
+```
+
+On the second test, I ran a regression to find out if passing the Bechdel test corresponded to having lower gross profits. Also controlling for the movie’s budget, which has a positive and significant relationship to a film’s gross profits, once again passing the Bechdel test did not have any effect on a film’s gross profits.
+
+```{r}
+summary(lm(log(intgross_2013.)~log(budget_2013.), data=rawData))
+```
+It should be noted here that gross profits vs budgets has a positive _significant_ relationship, from the regression analysis. The t-value is large enough to prove that this conclusion isn't fallacious.
+
+```{r}
+plot(lm(log(intgross_2013.)~log(budget_2013.)+factor(binary), data=rawData))
+summary(lm(log(intgross_2013.)~log(budget_2013.)+factor(binary), data=rawData))
+```
+
+This regression test makes it clear that our null hypothesis stands, and that passing the Bechdel test has no significance on how well the movie performs in terms of gross profits. The p-value here is very small, implying that the bechdel test binary factor is not significant. In other words, adding women to a film’s cast didn’t hurt how the movie performed internationally, dispelling any rumours or conversations, objectively, that women oriented movies don't "travel well".
+
+# Conclusion
+
+Hollywood is in the end, a business, with an objective goal in mind to make money. It isn't beholden to moral values and responsibilities of gender equity and representation. On the other spectrum is the conversation about theatre being the best reflection of the goods and bads in our society; equal representation and equity are a way to change society for the better. Somewhere between this conversation lies this analysis about the Bechdel test, which tries to take a subjective examination of basic female representation in a movie, and tries to objectify it with numbers that matter to that producer who is entrenched in well-found knowledge about the fact that "people don't want to watch movies with women in them". There are anecdotal signs that there’s a shift in thinking when it comes to movies featuring women and female relationships. Recently, Hollywood has been able to boast about the success of female-dominated films in the marketplace, which gives me hope.
+
+```{marginfigure}
+The biggest movie franchises of the last few years (like the Hunger Games) have had female protagonists (although most of their success has been attributed to their writers and production team rather than the lead actors themselves which is a whole other perception rabbithole that we could base an entirely different project on.)
+```
+
+Now that we have presented fairly concrete evidence that female representation isn't a significant aspect for the profits of a film, both domestically and internationally; and don't negatively affect the return on investment to a producer, we should be challenging a lot of those entrenched Hollywood opinions to make a case for gender equity in art forms like theater and film. Our analysis or testing methodology wasn't perfect by any means, for this is after all a subjective test, but some assumptions in place, we can safely assume that if not the raw numbers, the trends from our analysis and result definitely hold true.
+
+
+```{r eval=FALSE, include=FALSE}
+file.edit(
+  tufte:::template_resources(
+    'tufte_html', '..', 'skeleton', 'skeleton.Rmd'
+  )
+)
+```
