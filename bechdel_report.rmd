@@ -222,6 +222,7 @@ Here, it's clear that ROI and the budget of a film are a negative and significan
 ```
 
 ```{r}
+par(mfrow=c(2,2))
 plot(lm((ROI)~(budget_2013.)+factor(binary), data=rawData))
 summary(lm((ROI)~(budget_2013.)+factor(binary), data=rawData))
 ```
@@ -258,6 +259,7 @@ summary(lm(log(intgross_2013.)~log(budget_2013.), data=rawData))
 It should be noted here that gross profits vs budgets has a positive _significant_ relationship, from the regression analysis. The t-value is large enough to prove that this conclusion isn't fallacious.
 
 ```{r}
+par(mfrow=c(2,2))
 plot(lm(log(intgross_2013.)~log(budget_2013.)+factor(binary), data=rawData))
 summary(lm(log(intgross_2013.)~log(budget_2013.)+factor(binary), data=rawData))
 ```
@@ -279,8 +281,6 @@ Now that we have presented fairly concrete evidence that female representation i
 1. [The Data](https://github.com/fivethirtyeight/data/blob/master/bechdel/movies.csv) 
 2. [The Bechdel Test](https://bechdeltest.com/)
 3. [Creating the Next Bechdel Test](https://projects.fivethirtyeight.com/next-bechdel/)
-
-
 
 ```{r eval=FALSE, include=FALSE}
 file.edit(
