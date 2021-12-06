@@ -274,6 +274,13 @@ The biggest movie franchises of the last few years (like the Hunger Games) have 
 
 Now that we have presented fairly concrete evidence that female representation isn't a significant aspect for the profits of a film, both domestically and internationally; and don't negatively affect the return on investment to a producer, we should be challenging a lot of those entrenched Hollywood opinions to make a case for gender equity in art forms like theater and film. Our analysis or testing methodology wasn't perfect by any means, for this is after all a subjective test, but some assumptions in place, we can safely assume that if not the raw numbers, the trends from our analysis and result definitely hold true.
 
+# References
+
+1. [The Data](https://github.com/fivethirtyeight/data/blob/master/bechdel/movies.csv) 
+2. [The Bechdel Test](https://bechdeltest.com/)
+3. [Creating the Next Bechdel Test](https://projects.fivethirtyeight.com/next-bechdel/)
+
+
 
 ```{r eval=FALSE, include=FALSE}
 file.edit(
